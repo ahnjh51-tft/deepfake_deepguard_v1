@@ -1,0 +1,120 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
+All colors MUST be HSL.
+*/
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 215 25% 20%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 20%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 20%;
+
+    --primary: 205 100% 39%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 15% 92%;
+    --secondary-foreground: 215 25% 20%;
+
+    --muted: 210 15% 94%;
+    --muted-foreground: 215 16% 46%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 205 100% 39%;
+
+    --radius: 0.5rem;
+
+    /* Intel color palette - exact colors from user */
+    --intel-bright-cyan: 196 97% 54%;
+    --intel-light-cyan: 197 97% 71%;
+    --intel-medium-blue: 205 94% 40%;
+    --intel-deep-teal: 198 99% 30%;
+    --intel-pale-blue: 200 36% 82%;
+    --intel-dark-blue: 207 94% 30%;
+    
+    --shadow-subtle: 0 1px 3px 0 hsl(215 25% 20% / 0.05);
+    --shadow-medium: 0 4px 6px -1px hsl(215 25% 20% / 0.1);
+    --shadow-card: 0 2px 8px 0 hsl(200 36% 82% / 0.4);
+  }
+
+  .dark {
+    --background: 220 18% 12%;
+    --foreground: 210 20% 95%;
+
+    --card: 220 18% 15%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 220 18% 15%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 205 100% 50%;
+    --primary-foreground: 220 18% 12%;
+
+    --secondary: 220 15% 20%;
+    --secondary-foreground: 210 20% 95%;
+
+    --muted: 220 15% 18%;
+    --muted-foreground: 215 15% 65%;
+
+    --accent: 199 89% 55%;
+    --accent-foreground: 220 18% 12%;
+
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 210 20% 95%;
+
+    --border: 220 15% 25%;
+    --input: 220 15% 25%;
+    --ring: 205 100% 50%;
+
+    /* Intel color palette - dark mode adjusted */
+    --intel-bright-cyan: 196 97% 60%;
+    --intel-light-cyan: 197 97% 75%;
+    --intel-medium-blue: 205 94% 50%;
+    --intel-deep-teal: 198 99% 40%;
+    --intel-pale-blue: 200 36% 25%;
+    --intel-dark-blue: 207 94% 40%;
+    
+    --shadow-subtle: 0 1px 3px 0 hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 6px -1px hsl(0 0% 0% / 0.4);
+    --shadow-card: 0 2px 8px 0 hsl(200 36% 82% / 0.1);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-family: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+  }
+}
+
+@layer utilities {
+  .shadow-subtle {
+    box-shadow: var(--shadow-subtle);
+  }
+  
+  .shadow-medium {
+    box-shadow: var(--shadow-medium);
+  }
+  
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+}
