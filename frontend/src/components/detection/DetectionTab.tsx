@@ -15,13 +15,16 @@ interface DetectionResult {
   original_with_boxes?: string;
   ela_heatmap?: string;
   ela_with_boxes?: string;
-  message?: string;
 }
 
 const MODEL_ID = "ela_rf";
 const MODEL_NAME = "ELA + Random Forest";
 
-const ImageUpload = ({ onImageSelect }: { onImageSelect: (file: File) => void }) => {
+const ImageUpload = ({ onImageSelect, previewImage, onClear }: {
+  onImageSelect: (file: File) => void;
+  previewImage: string | null;
+  onClear: () => void;
+}) => {
   const [dragActive, setDragActive] = useState(false);
 
   const handleDrag = (e: React.DragEvent) => {
@@ -52,28 +55,59 @@ const ImageUpload = ({ onImageSelect }: { onImageSelect: (file: File) => void })
 
   return (
     <div
-      className={`relative border-2 border-dashed rounded-lg p-12 text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-secondary/50"
-        }`}
+      className={`relative border-2 border-dashed rounded-lg text-center transition-colors ${dragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 hover:bg-secondary/50"
+        } ${previewImage ? "p-4" : "p-12"}`}
       onDragEnter={handleDrag}
       onDragLeave={handleDrag}
       onDragOver={handleDrag}
       onDrop={handleDrop}
     >
-      <input
-        type="file"
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-        onChange={handleChange}
-        accept="image/png, image/jpeg, image/webp"
-      />
-      <div className="flex flex-col items-center gap-4">
-        <div className="p-4 rounded-full bg-secondary">
-          <Upload className="w-8 h-8 text-muted-foreground" />
+      {!previewImage ? (
+        <>
+          <input
+            type="file"
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            onChange={handleChange}
+            accept="image/png, image/jpeg, image/webp"
+          />
+          <div className="flex flex-col items-center gap-4">
+            <div className="p-4 rounded-full bg-secondary">
+              <Upload className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-lg font-medium text-foreground">クリックまたはドラッグ＆ドロップ</p>
+              <p className="text-sm text-muted-foreground mt-1">PNG, JPG, WEBP (最大8MB)</p>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="space-y-3">
+          <div className="relative rounded-lg overflow-hidden border border-border bg-secondary/10">
+            <img src={previewImage} alt="Preview" className="w-full h-64 object-contain" />
+          </div>
+          <div className="flex gap-2">
+            <label className="flex-1 cursor-pointer">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleChange}
+                accept="image/png, image/jpeg, image/webp"
+              />
+              <div className="w-full px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors text-sm font-medium text-center">
+                別の画像を選択
+              </div>
+            </label>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onClear}
+              className="px-4"
+            >
+              削除
+            </Button>
+          </div>
         </div>
-        <div>
-          <p className="text-lg font-medium text-foreground">クリックまたはドラッグ＆ドロップ</p>
-          <p className="text-sm text-muted-foreground mt-1">PNG, JPG, WEBP (最大8MB)</p>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
@@ -114,16 +148,18 @@ const DetectionTab = () => {
   };
 
   const mapResponseToResult = (data: any): DetectionResult => {
-    // Handle both old and new API formats
-    const isFake = data.is_fake ?? (data.prediction === "Fake");
-    const confidence = data.confidence ?? 0;
+    const analysisPanel = data.analysis_panel || {};
+    const explainability = data.explainability || {};
+
+    const isFake = analysisPanel.is_fake ?? false;
+    const confidence = analysisPanel.fake_probability ?? 0;
+
     return {
       is_fake: isFake,
       confidence: confidence,
-      original_with_boxes: data.original_with_boxes,
-      ela_heatmap: data.ela_heatmap,
-      ela_with_boxes: data.ela_with_boxes,
-      message: data.message,
+      original_with_boxes: explainability.original_with_boxes,
+      ela_heatmap: explainability.ela_heatmap,
+      ela_with_boxes: explainability.ela_with_boxes,
     };
   };
 
@@ -135,17 +171,17 @@ const DetectionTab = () => {
     setExplainability(null);
 
     const formData = new FormData();
-    formData.append("file", uploadedFile);
-    formData.append("model_id", MODEL_ID);
+    formData.append("image", uploadedFile);
 
     try {
-      // Use relative URL to proxy
-      const response = await fetch("/api/detect", {
+      const apiUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/analyze`, {
         method: "POST",
         body: formData,
       });
 
       if (!response.ok) {
+        const errorText = await response.text();
         throw new Error(`Server error: ${response.status}`);
       }
 
@@ -153,9 +189,8 @@ const DetectionTab = () => {
       const detectionResult = mapResponseToResult(data);
 
       setResult(detectionResult);
-      setExplainability(detectionResult);
+      setExplainability(data.explainability || {});
 
-      // Add to history
       addEntry({
         id: Date.now().toString(),
         timestamp: new Date().toISOString(),
@@ -179,7 +214,7 @@ const DetectionTab = () => {
       toast({
         variant: "destructive",
         title: "エラー",
-        description: "検出に失敗しました。もう一度お試しください。",
+        description: error instanceof Error ? error.message : "検出に失敗しました。もう一度お試しください。",
       });
     } finally {
       setIsDetecting(false);
@@ -201,25 +236,16 @@ const DetectionTab = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6 pt-6">
-            <ImageUpload onImageSelect={handleImageSelect} />
-
-            {previewImage && (
-              <div className="relative rounded-lg overflow-hidden border border-border bg-secondary/10">
-                <img src={previewImage} alt="Preview" className="w-full h-64 object-contain" />
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="absolute top-2 right-2 shadow-sm"
-                  onClick={() => {
-                    setUploadedFile(null);
-                    setPreviewImage(null);
-                    setResult(null);
-                  }}
-                >
-                  削除
-                </Button>
-              </div>
-            )}
+            <ImageUpload
+              onImageSelect={handleImageSelect}
+              previewImage={previewImage}
+              onClear={() => {
+                setUploadedFile(null);
+                setPreviewImage(null);
+                setResult(null);
+                setExplainability(null);
+              }}
+            />
 
             <div className="space-y-3">
               <label className="text-sm font-normal text-foreground">検出モデル</label>
@@ -288,8 +314,8 @@ const DetectionTab = () => {
               <div className="space-y-8 animate-fade-in">
                 {/* Result Banner */}
                 <div className={`p-6 rounded-lg border flex items-center gap-4 ${result.is_fake
-                  ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400"
-                  : "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-900/50 dark:text-emerald-400"
+                    ? "bg-red-50 border-red-200 text-red-700 dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700 dark:bg-emerald-900/20 dark:border-emerald-900/50 dark:text-emerald-400"
                   }`}>
                   {result.is_fake ? (
                     <XCircle className="w-12 h-12 flex-shrink-0" />
@@ -300,9 +326,10 @@ const DetectionTab = () => {
                     <h3 className="text-2xl font-bold">
                       {result.is_fake ? "偽物 (FAKE)" : "本物 (REAL)"}
                     </h3>
-                    <p className="text-sm opacity-90 mt-1">
-                      信頼度スコア: <span className="font-mono font-bold text-lg">{(result.confidence * 100).toFixed(1)}%</span>
-                    </p>
+                    <div className="text-sm opacity-90 mt-2 space-y-1">
+                      <p>本物: <span className="font-mono font-bold text-base">{((1 - result.confidence) * 100).toFixed(1)}%</span></p>
+                      <p>偽物: <span className="font-mono font-bold text-base">{(result.confidence * 100).toFixed(1)}%</span></p>
+                    </div>
                   </div>
                 </div>
 
@@ -335,20 +362,51 @@ const DetectionTab = () => {
         </Card>
       </div>
 
-      {/* Image Dialog */}
+      {/* Image Dialog with Navigation */}
       <Dialog open={enlargedIndex !== null} onOpenChange={() => setEnlargedIndex(null)}>
         <DialogContent className="max-w-4xl bg-background border-border">
           {enlargedIndex !== null && viewImages[enlargedIndex] && (
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-2">
                 <h3 className="font-medium">{viewImages[enlargedIndex].title}</h3>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  {enlargedIndex + 1} / {viewImages.length}
+                </div>
               </div>
               <div className="relative bg-secondary/20 rounded-lg overflow-hidden flex items-center justify-center min-h-[400px]">
+                {/* Previous Button */}
+                {enlargedIndex > 0 && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute left-4 top-1/2 -translate-y-1/2 z-10 shadow-lg"
+                    onClick={() => setEnlargedIndex(enlargedIndex - 1)}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </Button>
+                )}
+
                 <img
                   src={viewImages[enlargedIndex].src}
                   alt={viewImages[enlargedIndex].title}
                   className="max-w-full max-h-[80vh] object-contain"
                 />
+
+                {/* Next Button */}
+                {enlargedIndex < viewImages.length - 1 && (
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 z-10 shadow-lg"
+                    onClick={() => setEnlargedIndex(enlargedIndex + 1)}
+                  >
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Button>
+                )}
               </div>
             </div>
           )}
